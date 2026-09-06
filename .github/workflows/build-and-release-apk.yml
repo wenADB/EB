@@ -41,7 +41,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: ☕ Set up JDK 17
+      - name: ☕ Set up JDK 17 (Stable LTS)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -51,6 +51,7 @@ jobs:
       - name: 🔐 Prepare Environment & Keystore
         run: |
           echo "Preparing build configuration..."
+          # Create .env from template if missing
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
               cp .env.example .env
@@ -59,6 +60,7 @@ jobs:
             fi
           fi
 
+          # Restore debug.keystore if base64 encoded version exists
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
             echo "Decoding debug.keystore from base64..."
             base64 -d debug.keystore.base64 > debug.keystore
@@ -84,10 +86,11 @@ jobs:
             ./gradlew assembleDebug --no-daemon --stacktrace
           fi
 
-      - name: 📦 Locate and Prepare APK Artifacts
+      - name: 📦 Locate and Package APK Assets
         id: prepare_artifacts
         run: |
           mkdir -p release_assets
+          # Locate built APKs
           APK_FILES=$(find app/build/outputs/apk/ -type f -name "*.apk")
           echo "Found APK files: $APK_FILES"
 
@@ -105,16 +108,15 @@ jobs:
             FILENAME=$(basename "$apk")
             DEST_NAME="ExtremeBooster-${VERSION_TAG}-${FILENAME}"
             cp "$apk" "release_assets/${DEST_NAME}"
-            echo "Created asset: release_assets/${DEST_NAME}"
+            echo "Prepared asset: release_assets/${DEST_NAME}"
             
-            # Generate SHA256 checksum
+            # Compute SHA256 checksum
             sha256sum "$apk" | awk '{print $1}' > "release_assets/${DEST_NAME}.sha256"
           done
 
           ls -la release_assets/
-          echo "apk_count=$(ls -1 release_assets/*.apk | wc -l)" >> $GITHUB_OUTPUT
 
-      - name: 📤 Upload Build Artifacts (Actions Run)
+      - name: 📤 Upload Build Artifacts to Actions Run
         uses: actions/upload-artifact@v4
         with:
           name: ExtremeBooster-APK-${{ github.ref_name }}
@@ -130,17 +132,20 @@ jobs:
             TAG="v1.0.0-build.${{ github.run_number }}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Release tag to use: $TAG"
+          echo "Release tag: $TAG"
 
-      - name: 🚀 Publish GitHub Release with APK Assets
+      - name: 🚀 Publish GitHub Release (Native GitHub CLI)
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
-          name: ${{ github.event.inputs.release_title != '' && github.event.inputs.release_title || steps.release_tag.outputs.tag }}
-          files: release_assets/*
-          generate_release_notes: true
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release_tag.outputs.tag }}"
+          TITLE="${{ github.event.inputs.release_title != '' && github.event.inputs.release_title || steps.release_tag.outputs.tag }}"
+          
+          echo "Publishing GitHub Release for tag: $TAG"
+          
+          # Use GitHub's official pre-installed CLI - zero Docker, 100% reliable
+          gh release create "$TAG" release_assets/* \
+            --title "$TITLE" \
+            --generate-notes || \
+          gh release upload "$TAG" release_assets/* --clobber
