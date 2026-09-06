@@ -66,6 +66,15 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
+          # Generate debug keystore if it doesn't exist
+          if [ ! -f debug.keystore ]; then
+            echo "Generating debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey \
+              -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US" -noprompt
+            echo "Debug keystore generated successfully"
+          fi
+
       - name: 🔧 Make Gradle Executable
         run: chmod +x ./gradlew
 
@@ -106,6 +115,49 @@ jobs:
 
           for apk in $APK_FILES; do
             FILENAME=$(basename "$apk")
+            DEST_NAME="ExtremeBooster-${VERSION_TAG}-${FILENAME}"
+            cp "$apk" "release_assets/${DEST_NAME}"
+            echo "Prepared asset: release_assets/${DEST_NAME}"
+            
+            # Compute SHA256 checksum
+            sha256sum "$apk" | awk '{print $1}' > "release_assets/${DEST_NAME}.sha256"
+          done
+
+          ls -la release_assets/
+
+      - name: 📤 Upload Build Artifacts to Actions Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExtremeBooster-APK-${{ github.ref_name }}
+          path: release_assets/*
+          retention-days: 30
+
+      - name: 🏷️ Determine Release Tag Name
+        id: release_tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v1.0.0-build.${{ github.run_number }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG"
+
+      - name: 🚀 Publish GitHub Release (Native GitHub CLI)
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release_tag.outputs.tag }}"
+          TITLE="${{ github.event.inputs.release_title != '' && github.event.inputs.release_title || steps.release_tag.outputs.tag }}"
+          
+          echo "Publishing GitHub Release for tag: $TAG"
+          
+          # Use GitHub's official pre-installed CLI - zero Docker, 100% reliable
+          gh release create "$TAG" release_assets/* \
+            --title "$TITLE" \
+            --generate-notes || \
+          gh release upload "$TAG" release_assets/* --clobber
             DEST_NAME="ExtremeBooster-${VERSION_TAG}-${FILENAME}"
             cp "$apk" "release_assets/${DEST_NAME}"
             echo "Prepared asset: release_assets/${DEST_NAME}"
