@@ -1,0 +1,6 @@
+{
+  "name": "ExtremeBooster",
+  "description": "Root-free Android game booster and optimization engine with Shizuku integration, per-game profiling, floating HUD overlay, and dedicated Xiaomi HyperOS/MIUI thermal and FPS bypass.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
