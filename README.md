@@ -218,13 +218,13 @@ Built with **Jetpack Compose Material 3** utilizing an **Obsidian & Neon Emerald
 
 ## 🚀 Automated CI/CD & GitHub Releases
 
-ExtremeBooster is configured with an automated GitHub Actions workflow (`.github/workflows/build-and-release-apk.yml`) powered by the **[Build and Release APK](https://github.com/marketplace/actions/build-and-release-apk)** action.
+ExtremeBooster is configured with an automated GitHub Actions workflow (`.github/workflows/build-and-release-apk.yml`) for seamless APK compilation and distribution.
 
 Every time you push a version tag or trigger the workflow, GitHub Actions automatically:
 1. Compiles the APK via Gradle (`./gradlew assembleDebug` or `assembleRelease`).
 2. Generates SHA-256 integrity checksums.
 3. Uploads the build artifact to the GitHub Actions run for instant testing.
-4. Invokes `sangatdesai/release-apk` and publishes a tagged release on your GitHub repository with downloadable APK assets.
+4. Publishes a tagged release on your GitHub repository with downloadable APK assets and release notes.
 
 ### 🏷️ Trigger a Release via Git Tag
 

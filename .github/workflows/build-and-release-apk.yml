@@ -17,7 +17,7 @@ on:
           - debug
           - release
       release_title:
-        description: 'Release Title (e.g. ExtremeBooster v1.0)'
+        description: 'Release Title (e.g. ExtremeBooster v1.0.0)'
         required: false
         default: ''
         type: string
@@ -94,6 +94,11 @@ jobs:
           APK_FILES=$(find app/build/outputs/apk/ -type f -name "*.apk")
           echo "Found APK files: $APK_FILES"
 
+          if [ -z "$APK_FILES" ]; then
+            echo "ERROR: No APK files found in app/build/outputs/apk/!"
+            exit 1
+          fi
+
           VERSION_TAG="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION_TAG="manual-${{ github.run_number }}"
@@ -119,19 +124,23 @@ jobs:
           path: release_assets/*
           retention-days: 30
 
-      - name: ⚡ Build and Release APK (Marketplace Action)
-        uses: sangatdesai/release-apk@main
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_FOLDER: app
+      - name: 🏷️ Determine Release Tag Name
+        id: release_tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v1.0.0-build.${{ github.run_number }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag to use: $TAG"
 
-      - name: 🏷️ Publish GitHub Release with Attachments
+      - name: 🚀 Publish GitHub Release with APK Assets
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.event.inputs.release_title || github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: ${{ github.event.inputs.release_title != '' && github.event.inputs.release_title || steps.release_tag.outputs.tag }}
           files: release_assets/*
           generate_release_notes: true
           draft: false
