@@ -19,6 +19,7 @@ $$/   $$/   $$/    $$$$$$/  $$$$$$/  $$/      $$/ $$$$$$$$/
 ### *Root-Free Hardware Overclocking, Thermal Throttling Bypass & In-Game Telemetry Architecture for Android*
 
 [![Android](https://img.shields.io/badge/Android-14%2B%20(API%2034--36)-00E676?style=for-the-badge&logo=android&logoColor=black)](https://developer.android.com)
+[![Build & Release APK](https://img.shields.io/badge/CI%2FCD-Build%20%26%20Release%20APK-00E5FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/build-and-release-apk)
 [![Shizuku Privileged](https://img.shields.io/badge/Privilege-Shizuku%20ADB%20UID%202000-10B981?style=for-the-badge&logo=terminal&logoColor=white)](https://shizuku.rikka.app/)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-00B0FF?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![HyperOS / MIUI](https://img.shields.io/badge/Specialized-Xiaomi%20HyperOS-FF6F00?style=for-the-badge&logo=xiaomi&logoColor=white)](https://miui.com)
@@ -31,6 +32,7 @@ $$/   $$/   $$/    $$$$$$/  $$$$$$/  $$/      $$/ $$$$$$$$/
   <a href="#-quickstart--shizuku-setup">Setup Guide</a> •
   <a href="#-per-game-profiles">Game Profiling</a> •
   <a href="#-floating-hud-overlay">HUD Overlay</a> •
+  <a href="#-automated-cicd--github-releases">CI/CD Releases</a> •
   <a href="#-building-from-source">Build</a>
 </p>
 
@@ -211,6 +213,39 @@ Built with **Jetpack Compose Material 3** utilizing an **Obsidian & Neon Emerald
 - **Foldables & Tablets (Expanded Layout)**: Automatically reflows into a dual-pane workspace with a vertical **NavigationRail** and adaptive grid (`GridCells.Adaptive(320.dp)`).
 - **Tactile Haptic Feedback**: Contextual haptic impulses (`TextHandleMove` and `LongPress`) for tangible physical response.
 - **Predictive Back Navigation**: Graceful state preservation and screen transitions backed by Kotlin Coroutines & Flow.
+
+---
+
+## 🚀 Automated CI/CD & GitHub Releases
+
+ExtremeBooster is configured with an automated GitHub Actions workflow (`.github/workflows/build-and-release-apk.yml`) powered by the **[Build and Release APK](https://github.com/marketplace/actions/build-and-release-apk)** action.
+
+Every time you push a version tag or trigger the workflow, GitHub Actions automatically:
+1. Compiles the APK via Gradle (`./gradlew assembleDebug` or `assembleRelease`).
+2. Generates SHA-256 integrity checksums.
+3. Uploads the build artifact to the GitHub Actions run for instant testing.
+4. Invokes `sangatdesai/release-apk` and publishes a tagged release on your GitHub repository with downloadable APK assets.
+
+### 🏷️ Trigger a Release via Git Tag
+
+Push a version tag to trigger an automated build and release:
+
+```bash
+# Tag the current commit
+git tag v1.0.0
+
+# Push the tag to GitHub
+git push origin v1.0.0
+```
+
+### 🖱️ Trigger Manually via GitHub Actions UI
+
+You can also trigger a build at any time with a single click:
+1. Go to your repository on GitHub.
+2. Click on the **Actions** tab.
+3. Select **"Build and Release APK"** from the left sidebar.
+4. Click **Run workflow** ➔ Select branch and build type (`debug` or `release`).
+5. Download your APK under **Artifacts** or directly from the newly created **Release** page!
 
 ---
 

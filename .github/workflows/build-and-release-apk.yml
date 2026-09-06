@@ -1,0 +1,140 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'v*.*.*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type (debug or release)'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+      release_title:
+        description: 'Release Title (e.g. ExtremeBooster v1.0)'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-release:
+    name: 🚀 Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 🔐 Prepare Environment & Keystore
+        run: |
+          echo "Preparing build configuration..."
+          # Create .env from template if missing
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+          # Restore debug.keystore if base64 encoded version exists
+          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
+            echo "Decoding debug.keystore from base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
+      - name: 🔧 Make Gradle Executable
+        run: chmod +x ./gradlew
+
+      - name: 🔨 Compile APK with Gradle
+        env:
+          KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+          echo "Selected Build Type: $BUILD_TYPE"
+
+          if [ "$BUILD_TYPE" = "release" ] && [ -n "${{ secrets.STORE_PASSWORD }}" ]; then
+            echo "Running release build with configured signing keys..."
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            echo "Running debug build..."
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: 📦 Locate and Prepare APK Artifacts
+        id: prepare_artifacts
+        run: |
+          mkdir -p release_assets
+          # Find all generated APKs
+          APK_FILES=$(find app/build/outputs/apk/ -type f -name "*.apk")
+          echo "Found APK files: $APK_FILES"
+
+          VERSION_TAG="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION_TAG="manual-${{ github.run_number }}"
+          fi
+
+          for apk in $APK_FILES; do
+            FILENAME=$(basename "$apk")
+            DEST_NAME="ExtremeBooster-${VERSION_TAG}-${FILENAME}"
+            cp "$apk" "release_assets/${DEST_NAME}"
+            echo "Created asset: release_assets/${DEST_NAME}"
+            
+            # Generate SHA256 checksum
+            sha256sum "$apk" | awk '{print $1}' > "release_assets/${DEST_NAME}.sha256"
+          done
+
+          ls -la release_assets/
+          echo "apk_count=$(ls -1 release_assets/*.apk | wc -l)" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload Build Artifacts (Actions Run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExtremeBooster-APK-${{ github.ref_name }}
+          path: release_assets/*
+          retention-days: 30
+
+      - name: ⚡ Build and Release APK (Marketplace Action)
+        uses: sangatdesai/release-apk@main
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_FOLDER: app
+
+      - name: 🏷️ Publish GitHub Release with Attachments
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.inputs.release_title || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: release_assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
