@@ -1,0 +1,10 @@
+name: 'Build and Release APK'
+description: 'Build and release APK via GitHub Actions with Debian 12'
+inputs:
+  app_folder:
+    description: 'The app module folder'
+    required: false
+    default: 'app'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
